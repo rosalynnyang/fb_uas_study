@@ -1,0 +1,74 @@
+---
+title: "Raking FB sample"
+author: "Rosalynn Yang"
+date: "12/1/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Raking FB sample
+Raking parameters: age, gender, education
+
+Marginal population distributions based on 2019 ACS estimates
+Gender: 
+1 = female (50.8%)
+2 = male (49.2%)
+
+Age: 
+2 = 19-25 years old (8.7%)
+3 = 26-35 years old (18.5%)
+4 = 36-45 years old (17.0%)
+5 = 46-55 years old (16.6%)
+6 = 56-65 years old (17.2%)
+7 = 66+ years old (21.9%)
+
+
+```{r, libraries, include = FALSE}
+library(tidyverse)
+library(survey)
+```
+
+```{r, load data and data manipulation, include = FALSE}
+fb <- read_csv("../output/fb_numeric.csv")
+
+fb %>% 
+    select(Q1, Q2, Q3, Q3_1, Q4, Q5, Q6, Q8, Q9, Q10, Q11, Q12) %>%
+    subset(Q11 !=1) %>%
+    subset(Q9 %in% c(1, 2)) -> fb
+```
+
+
+```{r, initialize survey design object, include = FALSE}
+fb_svy_unweighted <- svydesign(ids=~1, data=fb)
+```
+
+
+```{r, calculate margin totals, include=FALSE}
+gender_dist <- data.frame(Q9=c("1", "2"), Freq=nrow(fb)*c(0.5077, 0.4923))
+age_dist <- data.frame(Q11=c("2", "3", "4", "5", "6", "7"), Freq=nrow(fb)*c(0.087, 0.185, 0.170, 0.166, 0.172, 0.219))
+```
+
+
+```{r, compute raking object, include=FALSE}
+fb_raked<- rake(fb_svy_unweighted, list(~Q9, ~Q11), list(gender_dist, age_dist))
+summary(fb_raked)
+
+fb_raked_trim <- trimWeights(fb_raked, lower=0.3, upper=3, strict=TRUE) 
+```
+
+
+```{r, check unweighted and weighted frequencies, echo=FALSE}
+mean(fb$Q1, na.rm=TRUE)
+svymean(~Q1, fb_raked, na.rm=TRUE)
+svytotal(~Q1, fb_raked, na.rm=TRUE)
+prop.table(svytable(~Q1, fb_raked))
+```
+
+```{r, write the weight variable back to data, include=FALSE}
+fb$weight <- fb_raked[["prob"]]
+```
+
+
