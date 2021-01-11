@@ -1,0 +1,131 @@
+---
+title: "Raking FB samples"
+author: "Rosalynn Yang"
+date: "1/12/2020"
+output: 
+  html_document:
+    toc: false
+    toc_float: false
+    number_sections: false
+    theme: readable
+    highlight: breezedark
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Raking parameters: gender, age group, marital status, education level 
+Marginal population distributions based on 2018 ACS 5-Year Estimates - Public Use Microdata Sample <br>
+
+Note: <19 is excluded from the population estimates before raking to match the survey data
+* Gender:
+  + 1 = female (51.4%)
+  + 2 = male (48.6%) <br>
+  
+* Age group: <br>
+  + 2 = 19-25 years old (12.7%) <br>
+  + 3 = 26-35 years old (18.1%) <br>
+  + 4 = 36-45 years old (16.6%) <br>
+  + 5 = 46-55 years old (17.5%) <br>
+  + 6 = 56-65 years old (16.5%) <br>
+  + 7 = 66+ years old (18.6%) <br> <br>
+  
+* Marital status:
+  + 1 = married (48.7%)
+  + 2 = never married, divorced, widowed, separated (51.3%) <br>
+
+
+* Education level:
+  + 1 = less than high school (12.0%)
+  + 2 = high school diploma (27.5%)
+  + 3 = some college (31.1%)
+  + 4 = bachelor's degree (18.6%)
+  + 5 = graduate degree (10.8%) <br>
+
+(can't use education level due to high level of missing data from week1)
+
+```{r, libraries, include = FALSE}
+library(tidyverse)
+library(survey)
+```
+
+```{r, load data, include = FALSE}
+control <- read_csv("../output/control.csv")
+covid <- read_csv("../output/covid.csv")
+privacy <- read_csv("../output/privacy.csv")
+finance <- read_csv("../output/finance.csv")
+mental <- read_csv("../output/mental.csv")
+uas <- read_csv("../output/uas_democlean.csv")
+```
+
+
+```{r, initialize survey design object (unweighted), include = FALSE}
+control_unwtd <- svydesign(ids=~1, data=control)
+covid_unwtd <- svydesign(ids=~1, data=covid)
+privacy_unwtd <- svydesign(ids=~1, data=privacy)
+finance_unwtd <- svydesign(ids=~1, data=finance)
+mental_unwtd <- svydesign(ids=~1, data=mental)
+uas_unwtd <- svydesign(ids=~1, data=uas)
+```
+
+
+```{r, calculate marginal totals, include = FALSE}
+create_marginal_totals <- function(df, gender_dist=gender_dist, age_dist=age_dist, marital_dist=marital_dist){
+  gender_mar = data.frame(gender=c("1", "2"), Freq=nrow(df)*gender_dist)
+  age_mar = data.frame(age_group=c("2", "3", "4", "5", "6", "7"), Freq=nrow(df)*age_dist)
+  marital_mar = data.frame(marital=c("1", "2"), Freq=nrow(df)*marital_dist)
+  marginal_totals_list <- list(gender_mar, age_mar, marital_mar)
+  return(marginal_totals_list)
+}
+
+gender_dist <- c(0.514, 0.486)
+age_dist <- c(0.127, 0.181, 0.166, 0.175, 0.165, 0.186)
+age_dist_privacy <- c(0.207, 0.190, 0.200, 0.189, 0.214) # special case for the privacy data: agegroup does not have level 2
+marital_dist <- c(0.487, 0.513)
+
+mtlist_control <- create_marginal_totals(control, gender_dist, age_dist, marital_dist)
+mtlist_covid <- create_marginal_totals(covid, gender_dist, age_dist, marital_dist)
+mtlist_finance <- create_marginal_totals(finance, gender_dist, age_dist, marital_dist)
+mtlist_mental <- create_marginal_totals(mental, gender_dist, age_dist, marital_dist)
+mtlist_uas <- create_marginal_totals(uas, gender_dist, age_dist, marital_dist)
+
+
+# calculating marginal totals for the privacy data (different agegroup distribution compared with other data)
+mtlist_privacy <- list(data.frame(gender=c("1", "2"), Freq=nrow(privacy)*gender_dist),
+                       data.frame(age_group=c("3", "4", "5", "6", "7"), Freq=nrow(privacy)*age_dist_privacy),
+                       data.frame(marital=c("1", "2"), Freq=nrow(privacy)*marital_dist))
+
+```
+
+
+```{r, compute raking object, include = FALSE}
+control_raked<- rake(control_unwtd, list(~gender, ~age_group, ~marital), list(mtlist_control[[1]], mtlist_control[[2]], mtlist_control[[3]]))
+covid_raked<- rake(covid_unwtd, list(~gender, ~age_group, ~marital), list(mtlist_covid[[1]], mtlist_covid[[2]], mtlist_covid[[3]]))
+privacy_raked<- rake(privacy_unwtd, list(~gender, ~age_group, ~marital), list(mtlist_privacy[[1]], mtlist_privacy[[2]], mtlist_privacy[[3]]))
+finance_raked<- rake(finance_unwtd, list(~gender, ~age_group, ~marital), list(mtlist_finance[[1]], mtlist_finance[[2]], mtlist_finance[[3]]))
+mental_raked<- rake(mental_unwtd, list(~gender, ~age_group, ~marital), list(mtlist_mental[[1]], mtlist_mental[[2]], mtlist_mental[[3]]))
+uas_raked<- rake(uas_unwtd, list(~gender, ~age_group, ~marital), list(mtlist_uas[[1]], mtlist_uas[[2]], mtlist_uas[[3]]))
+```
+
+
+```{r, write the weight variable back to data, include = FALSE}
+control$weight <- weights(control_raked)
+covid$weight <- weights(covid_raked)
+privacy$weight <- weights(privacy_raked)
+finance$weight <- weights(finance_raked)
+mental$weight <- weights(mental_raked)
+uas$weight <- weights(uas_raked)
+```
+
+
+```{r, output data for analysis, include = FALSE}
+write.csv(control, file = '../output/control_weighted.csv')
+write.csv(covid, file = '../output/covid_weighted.csv')
+write.csv(privacy, file = '../output/privacy_weighted.csv')
+write.csv(finance, file = '../output/finance_weighted.csv')
+write.csv(mental, file = '../output/mental_weighted.csv')
+write.csv(uas, file = '../output/uas_weighted.csv')
+```
