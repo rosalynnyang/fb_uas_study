@@ -50,7 +50,6 @@ def freq_percent_table(catvar, df):
     return ct
     
     
-
     
 # function for weighted frequency table of a single column: percentages and total
 def weighted_freq_percent_table(catvar, weightvar, df):
@@ -65,3 +64,37 @@ def weighted_freq_percent_table(catvar, weightvar, df):
     #display(ct)
     #display(Markdown("-----"))
     return ct
+
+
+
+def create_comparison_tables(fb_dataframe, uas_dataframe, fb_cols, uas_cols):
+    fb_freq = {}
+    fb_freq_r = {}
+    uas_freq = {}
+    uas_freq_r = {}
+    uas_freq_w = {}
+    comparison_tables = {}
+    # unweighted fb
+    for col in fb_cols:
+        fb_freq[col] = freq_percent_table(col, fb_dataframe)
+    # raked fb
+    for col in fb_cols:
+        fb_freq_r[col] = weighted_freq_percent_table(col, 'weight', fb_dataframe)
+    # unweighted uas
+    for col in uas_cols:
+        uas_freq[col] = freq_percent_table(col, uas_dataframe)
+     # raked uas
+    for col in uas_cols:
+        uas_freq_r[col] = weighted_freq_percent_table(col, 'weight', uas_dataframe)
+     # weighted uas
+    for col in uas_cols:
+        uas_freq_w[col] = weighted_freq_percent_table(col, 'final_weight', uas_dataframe)
+    # create comparison tables
+    for fb_col, uas_col in zip(fb_cols, uas_cols):
+        temp_df = pd.concat([fb_freq[fb_col], fb_freq_r[fb_col], uas_freq[uas_col], uas_freq_r[uas_col], uas_freq_w[uas_col]],  axis=1, ignore_index=True)
+        temp_df.columns = ['FB unweighted (%)', 'FB raked (%)', 'UAS unweighted (%)', 'UAS raked (%)', 'UAS originally weighted (%)']
+        comparison_tables[fb_col] = temp_df
+    # display
+    for fb_col in fb_cols:
+        display(Markdown(f"#### Comparing unweighted and weighted estimates of {fb_col}"))
+        display(comparison_tables[fb_col])
