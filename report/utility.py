@@ -2,6 +2,10 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2_contingency
 from IPython.display import display, Markdown
+import rpy2.robjects.numpy2ri
+from rpy2.robjects.packages import importr
+rpy2.robjects.numpy2ri.activate()
+stats = importr('stats')
 
 # function for creating crosstabs and producing chisq test results
 def crosstab_chisq(catvar1, catvar2, df, col_names=None, title=None):
@@ -98,3 +102,24 @@ def create_comparison_tables(fb_dataframe, uas_dataframe, fb_cols, uas_cols):
     for fb_col in fb_cols:
         display(Markdown(f"#### Comparing unweighted and weighted estimates of {fb_col}"))
         display(comparison_tables[fb_col])
+        
+
+# this function uses R stats package to calculate Fisher's exact test
+def fishers_p(catvar1, catvar2, df):
+    crosstab = pd.crosstab(df[catvar1], df[catvar2])
+    res = stats.fisher_test(crosstab.values, workspace = 2e9)
+    p = res[0][0]
+    return p
+
+
+# function for creating percent crosstabs only
+def crosstab_percent_table(catvar1, catvar2, df, col_order):
+    ct= pd.crosstab(df[catvar1], df[catvar2]).reindex(col_order, axis="columns")
+    cross_idx = ct.index.values
+    ct.loc['Total n'] = 0
+    for idx in cross_idx:
+        ct.loc['Total n'] += ct.loc[idx]
+    for idx in cross_idx:
+        ct.loc[idx] = ((ct.loc[idx] / ct.loc['Total n']) * 100).apply(lambda x: f"{x:,.1f}")
+    ct.loc['Total n'] = ct.loc['Total n'].apply(lambda x: f"{int(x):,}")
+    display(ct)
