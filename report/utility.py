@@ -113,7 +113,7 @@ def fishers_p(catvar1, catvar2, df):
 
 
 # function for creating percent crosstabs only
-def crosstab_percent_table(catvar1, catvar2, df, col_order):
+def crosstab_percent_table(catvar1, catvar2, df, col_order, chisq_test=False):
     ct= pd.crosstab(df[catvar1], df[catvar2]).reindex(col_order, axis="columns")
     cross_idx = ct.index.values
     ct.loc['Total n'] = 0
@@ -123,3 +123,6 @@ def crosstab_percent_table(catvar1, catvar2, df, col_order):
         ct.loc[idx] = ((ct.loc[idx] / ct.loc['Total n']) * 100).apply(lambda x: f"{x:,.1f}")
     ct.loc['Total n'] = ct.loc['Total n'].apply(lambda x: f"{int(x):,}")
     display(ct)
+    if chisq_test is True:
+        chi2, p, dof, ex = chi2_contingency(pd.crosstab(df[catvar1], df[catvar2]))
+        display(f"*Chi-squared statistic = {chi2.round(1)}, degree of freedom = {dof}, p = {p.round(3)}*")
