@@ -8,18 +8,18 @@ rpy2.robjects.numpy2ri.activate()
 stats = importr('stats')
 
 # function for creating crosstabs and producing chisq test results
-def crosstab_chisq(catvar1, catvar2, df, col_names=None, title=None):
+def crosstab_chisq(catvar1, catvar2, df, col_order=None, title=None, col_names=None, chisqtest=True):
     """
     This function helps calculate and display crosstab tables as well as
     chi-square test statistics (p-values) examining associations between two
     categorial variables.
     """
-    if title is None:
-        display(Markdown(f"#### Crosstab of {catvar1} and {catvar2}"))
-    else:
+    if title is not None:
         display(Markdown(f"{title}"))
     
     ct= pd.crosstab(df[catvar1], df[catvar2])
+    if col_order is not None:
+        ct = ct.reindex(col_order, axis="columns")
     cross_idx = ct.index.values
     ct.loc['Total n'] = 0
     for idx in cross_idx:
@@ -30,9 +30,9 @@ def crosstab_chisq(catvar1, catvar2, df, col_names=None, title=None):
     if col_names is not None:
         ct.columns = col_names
     display(ct)
-
-    chi2, p, dof, ex = chi2_contingency(pd.crosstab(df[catvar1], df[catvar2]))
-    display(Markdown(f"*Chi-squared statistic = {chi2.round(1)}, degree of freedom = {dof}, p = {p.round(3)}*"))
+    if chisqtest is True:
+        chi2, p, dof, ex = chi2_contingency(pd.crosstab(df[catvar1], df[catvar2]))
+        display(Markdown(f"*Chi-squared statistic = {chi2.round(1)}, degree of freedom = {dof}, p = {p.round(3)}*"))
     
     display(Markdown("-----"))
 
@@ -110,19 +110,3 @@ def fishers_p(catvar1, catvar2, df):
     res = stats.fisher_test(crosstab.values, workspace = 2e9)
     p = res[0][0]
     return p
-
-
-# function for creating percent crosstabs only
-def crosstab_percent_table(catvar1, catvar2, df, col_order, chisq_test=False):
-    ct= pd.crosstab(df[catvar1], df[catvar2]).reindex(col_order, axis="columns")
-    cross_idx = ct.index.values
-    ct.loc['Total n'] = 0
-    for idx in cross_idx:
-        ct.loc['Total n'] += ct.loc[idx]
-    for idx in cross_idx:
-        ct.loc[idx] = ((ct.loc[idx] / ct.loc['Total n']) * 100).apply(lambda x: f"{x:,.1f}")
-    ct.loc['Total n'] = ct.loc['Total n'].apply(lambda x: f"{int(x):,}")
-    display(ct)
-    if chisq_test is True:
-        chi2, p, dof, ex = chi2_contingency(pd.crosstab(df[catvar1], df[catvar2]))
-        display(f"*Chi-squared statistic = {chi2.round(1)}, degree of freedom = {dof}, p = {p.round(3)}*")
